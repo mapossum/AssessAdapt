@@ -1,0 +1,43 @@
+
+dojo.require("esri.map");
+
+
+//Ext JS 4.x class definition
+Ext.define('GrMapper.Map', {
+    extend: 'Ext.container.Container',
+	alias: 'widget.grmap',
+ 
+    title: '',
+	map: {},
+	
+	config: {
+        mapOptions: {}
+    },
+	
+	afterRender: function () {
+		
+  		map = new esri.Map(this.id,this.mapOptions);
+  		this.map = map
+
+		GrMapper.Map.superclass.afterRender.apply(this, arguments);
+		
+		this.on("resize",function(the, adjWidth, adjHeight, eOpts) {this.map.resize()})
+		
+		//dojo.connect(this.map,"onUpdateEnd", function(inlayer){alert('')})
+
+	},
+	
+	resizeContainer: function() {
+		//console.log("force resize");
+		this.map.resize();
+	},
+	
+ 
+    initComponent: function() {
+
+		this.componentCls = 'claro';
+		//this.style = "height: 100%; width: 100%;"
+        GrMapper.Map.superclass.initComponent.apply(this, arguments);
+		
+    }
+});
