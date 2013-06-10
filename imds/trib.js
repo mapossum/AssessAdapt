@@ -28,14 +28,16 @@ define(["dojo/_base/declare",
 	"dojox/charting/themes/Wetland", 
 	"dojox/charting/plot2d/StackedBars",
 	"dojox/charting/plot2d/Pie",
-	"dojox/charting/widget/Legend",
+	"dojox/charting/widget/SelectableLegend",
 	"dojox/charting/plot2d/Columns",
 	"dojox/charting/plot2d/Lines",
 	"dojox/charting/plot2d/Grid",
 	"dojox/gfx",
 	"dojox/gfx/utils",
 	"dojo/json",
-	 "dijit/form/Button"],
+	"dijit/form/Button",
+	"dijit/Dialog",
+	"esri/layers/ArcGISDynamicMapServiceLayer"],
 function(declare, 
     WidgetBase, 
     TemplatedMixin, 
@@ -71,7 +73,9 @@ function(declare,
     gfx,
     gfxutils,
     JSON,
-    Button){
+    Button,
+	Dialog,
+	ArcGISDynamicMapServiceLayer){
         return declare([WidgetBase, TemplatedMixin], {
             // Some default values for our author
             // These typically map to whatever you're handing into the constructor
@@ -196,7 +200,7 @@ function(declare,
 		
 		
 		
-		this.maplayer = new esri.layers.ArcGISDynamicMapServiceLayer("http://tnc.usm.edu/ArcGIS/rest/services/IMDS/ProjectTracking/MapServer");
+		this.maplayer = new ArcGISDynamicMapServiceLayer("http://tnc.usm.edu/ArcGIS/rest/services/IMDS/ProjectTracking/MapServer");
 		this.maplayer.setOpacity(0.6)	
 		this.maplayer.setVisibleLayers([1])
 		layerDefinitions = [];
@@ -398,7 +402,7 @@ function(declare,
 	
 	checkvals = checklinks.join(",")
 	
-	relatedlinkstext = ("<button data-dojo-type='dijit/form/Button' type='button'>Export Report</button><br>Related Content</b> - (Click a link below)<ul class='a'><li><a href='http://tnc.usm.edu/pt/?taxa=" + checkvals + "&level=" + lev + "&units=" + featlist.join(",") + "&geo=trib' target='_blank'>See projects addressing stream connectivity issue in this geography</a></li><li><a href='http://imds.greenlitestaging.com/knowledge-network/532' target='_blank'>Read more about Lake Sturgeon profile</a></li><li><a href='http://imds.greenlitestaging.com/data-catalog-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get data related to stream connectivity</a></li><li><a href='http://imds.greenlitestaging.com/dynamic-maps-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>View maps related to stream connectivity issue</a></li><li><a href='http://imds.greenlitestaging.com/decision-tools-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get tools related to stream connectivity</a></li></ul>");
+	relatedlinkstext = ("<br>Related Content</b> - (Click a link below)<ul class='a'><li><a href='http://tnc.usm.edu/pt/?taxa=" + checkvals + "&level=" + lev + "&units=" + featlist.join(",") + "&geo=trib' target='_blank'>See projects addressing stream connectivity issue in this geography</a></li><li><a href='http://imds.greenlitestaging.com/knowledge-network/532' target='_blank'>Read more about Lake Sturgeon profile</a></li><li><a href='http://imds.greenlitestaging.com/data-catalog/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get data related to stream connectivity</a></li><li><a href='http://imds.greenlitestaging.com/dynamic-maps-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>View maps related to stream connectivity issue</a></li><li><a href='http://imds.greenlitestaging.com/decision-tools-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get tools related to stream connectivity</a></li></ul>");
 	
 	td2.innerHTML = relatedlinkstext;
 	
@@ -406,6 +410,11 @@ function(declare,
 	mcoptions = {fieldname:"Miles_Connected_",start:2005,end:2012,title:"Miles Reconnected",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
 	droptions = {fieldname:"Barriers_Addressed_",start:2005,end:2012,title:"Barriers Addressed",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
 	foptions = {fieldname:"Funding_",start:2005,end:2012,title:"Funding",ingnoresum:false,yformat:Ext.util.Format.usMoney}
+	
+	parser.parse();
+
+	bn = domConstruct.create("div");
+	domConstruct.place(bn, td2, "first");
 	
 
 	var n = domConstruct.create("div");
@@ -459,7 +468,7 @@ function(declare,
         
         tc.startup();	
 
-     
+    console.log(feats); 
 	
 	spchart = this.createChartDojo(feats, spoptions);
 	
@@ -485,6 +494,91 @@ function(declare,
 //	});
 		
 //	this.add([tabs]);	
+
+console.log(spchart);
+
+	this.exportButton = new Button({
+        label: "Export Report",
+        onClick: function(){
+            // Do something:
+            //alert(feats[0].attributes);
+	
+			//window.open(dataUrl, "Chart Export", "width=600, height=300, location=no");
+			
+			outcontent = "Chart Data (Should have downloaded, Copy and Paste if nessessary):<br>"
+			
+			csvData = new Array();
+			
+			atts = new Array();
+			for (f in feats) {
+		
+				console.log(feats[f].attributes);
+				if (f==0) {
+				   for (a in feats[f].attributes) {
+				    atts.push(a);
+					}
+				csvData.push(atts);
+				outcontent = outcontent + atts.join(",");
+				outcontent = outcontent + "<br>"
+				}
+				
+				cfd = new Array();
+				
+				for (a in feats[f].attributes) {
+					
+					cfd.push(feats[f].attributes[a])
+				
+				}
+				csvData.push(cfd);
+				outcontent = outcontent + cfd.join(",");
+				outcontent = outcontent + "<br>"				
+		
+			}
+			
+			//var data = [["name1", "city1", "some other info"], ["name2", "city2", "more info"]];
+			var csvContent = "data:text/csv;charset=utf-8,";
+			csvData.forEach(function(infoArray, index){
+
+				dataString = infoArray.join(",");
+				csvContent += index < infoArray.length ? dataString+ "\n" : dataString;
+
+			}); 
+			
+			encodedUri = encodeURI(csvContent);
+			window.open(encodedUri);
+			
+			outcontent = outcontent + "<br>Right-click on the links below to download each chart. <br>"
+			
+			a = dojoquery("#" + cp1.id + " canvas")
+			dataUrl1 = a[0].toDataURL();
+			
+			outcontent = outcontent + "<a href='" + dataUrl1 +  "' target='_blank'> Download Sturgeon Population Chart </a><br>"
+			
+			a = dojoquery("#" + cp2.id + " canvas")
+			dataUrl2 = a[0].toDataURL();
+
+			outcontent = outcontent + "<a href='" + dataUrl2 +  "' target='_blank'> Download Miles Reconnected Chart </a><br>"
+			
+			a = dojoquery("#" + cp3.id + " canvas")
+			dataUrl3 = a[0].toDataURL();
+			
+			outcontent = outcontent + "<a href='" + dataUrl3 +  "' target='_blank'> Download Barriers Addressed Chart </a><br>"
+
+			a = dojoquery("#" + cp4.id + " canvas")
+			dataUrl4 = a[0].toDataURL();
+			
+			outcontent = outcontent + "<a href='" + dataUrl4 +  "' target='_blank'> Download Funding Chart </a><br>"
+
+			
+			myDialog = new Dialog({
+					title: "Report",
+					content: outcontent,  //"<img src=" + dataUrl + " />",
+					style: "width: 600px, height: 300px"
+			});
+			
+			myDialog.show();
+			
+        }}, bn);
 		
 	},
 		
@@ -721,7 +815,7 @@ sers.push({
   }		  	  
   chart1.render();	
   
-  legend = new Legend({ chart: chart1 }, options.refid + "legend");
+  legend = new Legend({ chart: chart1, htmlLabels: false}, options.refid + "legend");
   
   //ob = chart1.getSeries("Unproteed") 
   
