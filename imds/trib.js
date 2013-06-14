@@ -8,6 +8,7 @@ define(["dojo/_base/declare",
 	"dojo/dom-class", 
 	"dojo/_base/fx", 
 	"dojo/_base/lang", 
+	"dojo/_base/array",
 	"dojo/on", 
 	"dojo/mouse", 	
 	"dojo/query", 	
@@ -32,12 +33,15 @@ define(["dojo/_base/declare",
 	"dojox/charting/plot2d/Columns",
 	"dojox/charting/plot2d/Lines",
 	"dojox/charting/plot2d/Grid",
+	"dojox/charting/action2d/Tooltip",
 	"dojox/gfx",
 	"dojox/gfx/utils",
 	"dojo/json",
 	"dijit/form/Button",
 	"dijit/Dialog",
-	"esri/layers/ArcGISDynamicMapServiceLayer"],
+	"esri/layers/ArcGISDynamicMapServiceLayer",
+	"esri/tasks/IdentifyTask",
+	"esri/tasks/IdentifyParameters"],
 function(declare, 
     WidgetBase, 
     TemplatedMixin, 
@@ -46,6 +50,7 @@ function(declare,
     domClass, 
     baseFx, 
     lang, 
+	array,
     on, 
     mouse, 
     dojoquery, 
@@ -70,12 +75,16 @@ function(declare,
     Columns,
     Lines,
 	ChartGrid,
+	ChartTooltip,
     gfx,
     gfxutils,
     JSON,
     Button,
 	Dialog,
-	ArcGISDynamicMapServiceLayer){
+	ArcGISDynamicMapServiceLayer,
+	IdentifyTask,
+	IdentifyParameters
+	){
         return declare([WidgetBase, TemplatedMixin], {
             // Some default values for our author
             // These typically map to whatever you're handing into the constructor
@@ -233,6 +242,8 @@ function(declare,
       
 		this.clickhandle = dojo.connect(this.map,"onClick", lang.hitch(this,this.genreport));
 		
+		dojo.connect(this.map, "onMouseMove", lang.hitch(this,this.displaywatershed));
+		
 		
 		initExtent = new esri.geometry.Extent({"xmin":-90,"ymin":40,"xmax":-80,"ymax":53,"spatialReference":{"wkid":4326}});
 	
@@ -275,7 +286,44 @@ function(declare,
 			  
 		  },
 		   
-		   
+		 displaywatershed: function(evt) {
+
+			identify = new IdentifyTask("http://tnc.usm.edu/ArcGIS/rest/services/IMDS/ProjectTracking/MapServer");
+			identifyParams = new IdentifyParameters();
+			identifyParams.tolerance = 3;
+			identifyParams.returnGeometry = false;
+			identifyParams.layerIds = [1];
+			identifyParams.layerOption = esri.tasks.IdentifyParameters.LAYER_OPTION_ALL;
+			identifyParams.width  = this.map.width;
+			identifyParams.height = this.map.height;
+			identifyParams.geometry = evt.mapPoint;
+			identifyParams.mapExtent = this.map.extent;
+			identify.execute(identifyParams,lang.hitch(this,function(identifyResults) {this.idreturn(identifyResults, evt)}));
+			
+			this.map.infoWindow.hide();
+			
+		 },
+		 
+		 idreturn: function(identifyResults, evt) {
+		 
+				if (identifyResults.length == 0) { 
+					this.map.infoWindow.hide();
+				}
+		 
+				array.forEach(identifyResults, lang.hitch(this,function(entry, i){
+				    if (entry.feature.attributes.Level == this.currentlevel) {
+						console.log(entry.feature.attributes.InlandAquaticUnit );
+						//console.log(evt)
+						//g = evt.graphic;
+						this.map.infoWindow.setContent(entry.feature.attributes.InlandAquaticUnit);
+						this.map.infoWindow.setTitle("Watershed:");
+						this.map.infoWindow.show(evt.screenPoint,this.map.getInfoWindowAnchor(evt.screenPoint));
+						//this.map.infoWindow.show(0,0);
+					}
+				}));	
+				
+		 },
+		 
 		 genreport: function(evt) {
 		    		//thing.up().setTitle("Assess and Adapt - No Basin Selected");
 		
@@ -402,14 +450,14 @@ function(declare,
 	
 	checkvals = checklinks.join(",")
 	
-	relatedlinkstext = ("<br>Related Content</b> - (Click a link below)<ul class='a'><li><a href='http://tnc.usm.edu/pt/?taxa=" + checkvals + "&level=" + lev + "&units=" + featlist.join(",") + "&geo=trib' target='_blank'>See projects addressing stream connectivity issue in this geography</a></li><li><a href='http://imds.greenlitestaging.com/knowledge-network/532' target='_blank'>Read more about Lake Sturgeon profile</a></li><li><a href='http://imds.greenlitestaging.com/data-catalog/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get data related to stream connectivity</a></li><li><a href='http://imds.greenlitestaging.com/dynamic-maps-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>View maps related to stream connectivity issue</a></li><li><a href='http://imds.greenlitestaging.com/decision-tools-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get tools related to stream connectivity</a></li></ul>");
+	relatedlinkstext = ("<br>Related Content</b> - (Click a link below)<ul class='a'><li><a href='http://tnc.usm.edu/pt/?taxa=" + checkvals + "&level=" + lev + "&units=" + featlist.join(",") + "&geo=trib' target='_blank'>Interested in sturgeon conservation projects or funding? Click here.</a></li><li><a href='http://imds.greenlitestaging.com/knowledge-network/532' target='_blank'>Read more about Lake Sturgeon profile</a></li><li><a href='http://imds.greenlitestaging.com/data-catalog/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get data related to stream connectivity</a></li><li><a href='http://imds.greenlitestaging.com/dynamic-maps-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>View maps related to stream connectivity issue</a></li><li><a href='http://imds.greenlitestaging.com/decision-tools-search/search?keywords=&term_node_tid_depth%5B%5D=9&term_node_tid_depth_3%5B%5D=53' target='_blank'>Get tools related to stream connectivity</a></li></ul>");
 	
 	td2.innerHTML = relatedlinkstext;
 	
-	spoptions = {fieldname:"Sturgeon_Status_",start:2005,end:2012,title:"Sturgeon Population",ingnoresum:true,yformat:Ext.util.Format.numberRenderer('0,000')}
-	mcoptions = {fieldname:"Miles_Connected_",start:2005,end:2012,title:"Miles Reconnected",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
-	droptions = {fieldname:"Barriers_Addressed_",start:2005,end:2012,title:"Barriers Addressed",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
-	foptions = {fieldname:"Funding_",start:2005,end:2012,title:"Funding",ingnoresum:false,yformat:Ext.util.Format.usMoney}
+	spoptions = {fieldname:"Sturgeon_Status_",start:2005,end:2012,title:"Sturgeon Population", ylabel:"Total Sturgeon Population (count)",ingnoresum:true,yformat:Ext.util.Format.numberRenderer('0,000')}
+	mcoptions = {fieldname:"Miles_Connected_",start:2005,end:2012,title:"Miles Reconnected", ylabel:"Miles of Stream Reconnected",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
+	droptions = {fieldname:"Barriers_Addressed_",start:2005,end:2012,title:"Barriers Addressed", ylabel:"Number of Dams Removed",ingnoresum:false,yformat:Ext.util.Format.numberRenderer('0,000')}
+	foptions = {fieldname:"Funding_",start:2005,end:2012,title:"Funding", ylabel:"Funding ($)",ingnoresum:false,yformat:Ext.util.Format.usMoney}
 	
 	parser.parse();
 
@@ -592,6 +640,7 @@ console.log(spchart);
   intitle = options.title;
   ignorersum = options.ingnoresum;
   yformat = options.yformat;
+  ylab = options.ylabel;
 
 sers = [{
             type: 'line',
@@ -789,8 +838,17 @@ sers.push({
   cloc = dojoquery("#" + options.refid);
   chart1 = new Chart(cloc[0], {});
   
+  markers = {
+	circle: "m-1,0 c0,-2 4,-2 4,0 m-4,0 c0,2 4,2 4,0",
+	square: "m-3,-3 l0,6 6,0 0,-6 z",
+	diamond: "m0,-3 l3,3 -3,3 -3,-3 z",
+	plus: "m0,-3 l0,6 m-3,-3 l6,0",
+	x: "m-3,-3 l6,6 m0,-6 l-6,6",
+	uptriangle: "m-3,3 l3,-6 3,6 z",
+	downtriangle: "m-3,-3 l3,6 3,-6 z"
+	};
   
-  chart1.addPlot("lins", {type: "Lines"});
+  chart1.addPlot("lins", {type: "Lines", markers: true});
   chart1.addPlot("cols", {type: "Columns", gap: 5});
 
   chart1.addPlot("default", { type: ChartGrid,
@@ -798,25 +856,35 @@ sers.push({
          hMinorLines: false,
          vMajorLines: false,
          vMinorLines: false,
+		 markers: true,
+		 markerSize: 1,
          majorHLine: { color: "#aaa", width: 1 }});
 
+   ndig = maxval.toString().length - 1
+   
+   powv = (Math.pow(10,ndig))
+   
   chart1.addAxis("x", {minorTicks: false, title:"Year",labels: labelarray, titleOrientation:"away", htmlLabels: false});
-  chart1.addAxis("y", {vertical: true, title: intitle, leftBottom: true, minorTicks: false, htmlLabels: false, min: 0, max: Math.ceil(maxval / 10) * 10});
+  chart1.addAxis("y", {vertical: true, title: ylab, leftBottom: true, minorTicks: false, htmlLabels: false, min: 0, max: Math.ceil(maxval / powv) * powv});
 
   
-  chart1.addSeries(" Goal",goalarray,{stroke: {color:"#f00", width:"3"}, fill: "#0f0", plot:"lins"});
+  chart1.addSeries(" Goal",goalarray,{stroke: {color:"#f00", width:"3"}, marker: markers.circle, fill: "#0f0", plot:"lins"});
   if (ogoalarray.length > 0) {
-	chart1.addSeries(" Yearly Goal",ogoalarray,{stroke: {color:"#fa0", width:"3"}, fill: "#0f0", plot:"lins"});
+	chart1.addSeries(" Yearly Goal",ogoalarray,{stroke: {color:"#fa0", width:"3"}, marker: markers.circle, fill: "#0f0", plot:"lins"});
   }
  
-  chart1.addSeries( " " + intitle,dataarray,{stroke: {color:"#00f", width:"3"}, fill: "#0f0", plot:"lins"});
+  chart1.addSeries( " " + intitle,dataarray,{stroke: {color:"#00f", width:"3"}, marker: markers.circle, fill: "#0f0", plot:"lins"});
   if (ignorersum == false) {
 	chart1.addSeries(" Cumulative",cdataarray,{stroke: {color:"#0a0"}, fill: "#7b4", plot:"cols"});
-  }		  	  
+  }	
+
+  var tt = new ChartTooltip(chart1,"lins");
+  
   chart1.render();	
   
   legend = new Legend({ chart: chart1, htmlLabels: false}, options.refid + "legend");
   
+
   //ob = chart1.getSeries("Unproteed") 
   
   //console.log(chart1)
